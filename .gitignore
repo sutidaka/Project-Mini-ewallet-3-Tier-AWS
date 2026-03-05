@@ -1,0 +1,10 @@
+.env
+*.csv
+*.pem
+*.key
+*.xlsx
+__pycache__
+node_modules
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
