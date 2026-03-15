@@ -1,0 +1,133 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION   = 'ap-southeast-1'
+        AWS_ACCOUNT  = '314146333464'
+
+        BACKEND_ECR  = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-backend'
+        FRONTEND_ECR = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-frontend'
+
+        IMAGE_TAG    = "${BUILD_NUMBER}"
+
+        APP_SERVER   = '10.0.20.145'
+        WEB_SERVER   = '10.0.1.94'
+        SSH_USER     = 'ec2-user'
+
+        APP_DEPLOY_PATH = '/opt/ewallet/backend'
+        WEB_DEPLOY_PATH = '/opt/ewallet/frontend'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/sutidaka/Project-Mini-ewallet-AWS.git'
+            }
+        }
+
+        stage('Build Backend Image') {
+            steps {
+                sh '''
+                docker build -t ewallet-backend:${IMAGE_TAG} App/backend
+                '''
+            }
+        }
+
+        stage('Build Frontend Image') {
+            steps {
+                sh '''
+                docker build -t ewallet-frontend:${IMAGE_TAG} App/frontend
+                '''
+            }
+        }
+
+        stage('Login to ECR') {
+            steps {
+                sh '''
+                aws ecr get-login-password --region ${AWS_REGION} \
+                | docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                '''
+            }
+        }
+
+        stage('Tag and Push Images') {
+            steps {
+                sh '''
+                docker tag ewallet-backend:${IMAGE_TAG} ${BACKEND_ECR}:${IMAGE_TAG}
+                docker push ${BACKEND_ECR}:${IMAGE_TAG}
+
+                docker tag ewallet-frontend:${IMAGE_TAG} ${FRONTEND_ECR}:${IMAGE_TAG}
+                docker push ${FRONTEND_ECR}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Prepare Remote Paths') {
+            steps {
+                sshagent(credentials: ['ssh-ewallet']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${APP_SERVER} "mkdir -p ${APP_DEPLOY_PATH}"
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${WEB_SERVER} "mkdir -p ${WEB_DEPLOY_PATH}"
+                    '''
+                }
+            }
+        }
+
+        stage('Copy Compose Files') {
+            steps {
+                sshagent(credentials: ['ssh-ewallet']) {
+                    sh '''
+                    scp -o StrictHostKeyChecking=no App/deploy/docker-compose.app.yml ${SSH_USER}@${APP_SERVER}:${APP_DEPLOY_PATH}/docker-compose.yml
+                    scp -o StrictHostKeyChecking=no App/deploy/docker-compose.web.yml ${SSH_USER}@${WEB_SERVER}:${WEB_DEPLOY_PATH}/docker-compose.yml
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Backend') {
+            steps {
+                sshagent(credentials: ['ssh-ewallet']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${APP_SERVER} "
+                        aws ecr get-login-password --region ${AWS_REGION} \
+                        | docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com && \
+                        cd ${APP_DEPLOY_PATH} && \
+                        export IMAGE_TAG=${IMAGE_TAG} && \
+                        docker compose pull && \
+                        docker compose up -d && \
+                        docker ps
+                    "
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Frontend') {
+            steps {
+                sshagent(credentials: ['ssh-ewallet']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${WEB_SERVER} "
+                        aws ecr get-login-password --region ${AWS_REGION} \
+                        | docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com && \
+                        cd ${WEB_DEPLOY_PATH} && \
+                        export IMAGE_TAG=${IMAGE_TAG} && \
+                        docker compose pull && \
+                        docker compose up -d && \
+                        docker ps
+                    "
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deploy completed successfully.'
+        }
+        failure {
+            echo 'Deploy failed. Please check build logs.'
+        }
+    }
+}
