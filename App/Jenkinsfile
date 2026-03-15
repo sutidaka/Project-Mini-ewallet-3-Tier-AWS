@@ -18,13 +18,18 @@ pipeline {
         WEB_DEPLOY_PATH = '/opt/ewallet/frontend'
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/sutidaka/Project-Mini-ewallet-AWS.git'
-            }
-        }
+    stage('Checkout') {
+    steps {
+        checkout([
+            $class: 'GitSCM',
+            branches: [[name: '*/main']],
+            userRemoteConfigs: [[
+                url: 'https://github.com/sutidaka/Project-Mini-ewallet-AWS.git',
+                credentialsId: 'tokengit'
+            ]]
+        ])
+    }
+}
 
         stage('Build Backend Image') {
             steps {
