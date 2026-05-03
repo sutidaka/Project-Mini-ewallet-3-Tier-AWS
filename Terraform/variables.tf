@@ -1,8 +1,4 @@
 
-# variable "admin_ip" {
-#   description = "Your current public IP address for SSH access"
-#   type        = string
-# }
 
 
 #VPC NETWORK & REGIAO Variables
