@@ -34,7 +34,7 @@ resource "aws_route_table" "rt_web_private" {
 resource "aws_route" "web_tier_default_rt" {
   route_table_id         = aws_route_table.rt_web_private.id
   destination_cidr_block = "0.0.0.0/0"
-  instance_id  = var.nat_instance_id # ใช้ instance_id ของ NAT Instance
+  instance_id            = var.nat_instance_id # ใช้ instance_id ของ NAT Instance
 }
 resource "aws_route_table_association" "web_tier_subnet" {
   count          = length(var.web_subnet_ids)
@@ -47,16 +47,16 @@ resource "aws_route_table_association" "web_tier_subnet" {
 # -------------------------
 
 resource "aws_route_table" "rt_app_private" {
-  vpc_id = var.vpc.id
+  vpc_id = var.vpc_id
 
   tags = {
     Name = "${var.project_name}-app-private-rt"
   }
 }
 resource "aws_route" "app_tier_default_rt" {
-  route_table_id = aws_route_table.rt_app_private.id
+  route_table_id         = aws_route_table.rt_app_private.id
   destination_cidr_block = "0.0.0.0/0"
-  instance_id = var.nat_instance_id
+  instance_id            = var.nat_instance_id
 }
 resource "aws_route_table_association" "app_tier_subnet" {
   count          = length(var.app_subnet_ids)
@@ -69,7 +69,7 @@ resource "aws_route_table_association" "app_tier_subnet" {
 # -------------------------
 
 resource "aws_route_table" "rt_db_private" {
-  vpc_id = var.vpc.id
+  vpc_id = var.vpc_id
 
   tags = {
     Name = "${var.project_name}-db-private-rt"
@@ -86,16 +86,16 @@ resource "aws_route_table_association" "db_tier_subnet" {
 # -------------------------
 
 resource "aws_route_table" "rt_monitoring_private" {
-  vpc_id = var.vpc.id
+  vpc_id = var.vpc_id
 
   tags = {
     Name = "${var.project_name}-monitoring-private-rt"
   }
 }
 resource "aws_route" "monitoring_tier_default_rt" {
-  route_table_id = aws_route_table.rt_monitoring_private.id
+  route_table_id         = aws_route_table.rt_monitoring_private.id
   destination_cidr_block = "0.0.0.0/0"
-  instance_id = var.nat_instance_id
+  instance_id            = var.nat_instance_id
 }
 resource "aws_route_table_association" "monitoring_tier_subnet" {
   count          = length(var.monitoring_subnet_ids)

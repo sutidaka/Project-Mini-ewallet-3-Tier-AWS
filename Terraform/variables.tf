@@ -1,19 +1,16 @@
-
-
-
-#VPC NETWORK & REGIAO Variables
+# VPC, networking, and region variables
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
 }
 
 variable "availability_zones" {
-  description = "List of Availability Zones to use )"
+  description = "List of Availability Zones to use"
   type        = list(string)
 }
 
 variable "project_name" {
-  description = "Name of the VPC"
+  description = "Project name used to prefix resources"
   type        = string
 }
 
@@ -28,32 +25,31 @@ variable "vpc_cidr" {
 }
 
 variable "public_subnet_cidrs" {
-  description = "List CIDR for public subnet"
+  description = "List CIDR for public subnets, one per Availability Zone"
   type        = list(string)
 }
 
 variable "web_tier_cidrs" {
-  description = "List CIDR for private subnet"
+  description = "List of Web-tier subnet CIDRs"
   type        = list(string)
 }
 
 variable "app_tier_cidrs" {
-  description = "List of App-tier Subnet CIDRs"
+  description = "List of App-tier subnet CIDRs"
   type        = list(string)
 }
 
-variable "db_tier_cidrs"{
-  description = "List of DB-tier Subnet CIDRs"
+variable "db_tier_cidrs" {
+  description = "List of DB-tier subnet CIDRs"
   type        = list(string)
 }
 
 variable "monitoring_cidrs" {
-  description = "Monitoring subnet CIDR (single-AZ)"
+  description = "Monitoring subnet CIDR list"
   type        = list(string)
 }
 
-
-# AMI & NAT Variables
+# NAT Instance variables
 variable "nat_instance_type" {
   description = "Instance type for NAT Instance"
   type        = string
@@ -64,275 +60,271 @@ variable "nat_ami_id" {
   type        = string
 }
 
+variable "tags" {
+  description = "Common tags for resources"
+  type        = map(string)
+  default     = {}
+}
 
-# EC2 Instance Type Variables  & AMI For EC2
+# EC2 Instance variables
 variable "ami_id" {
-  description = "AMI ID for all EC2 instances"
+  description = "AMI ID for EC2 workload instances"
   type        = string
 }
 
-variable "frontend_instance_type" {
-  description = "Instance type for  Frontend EC2"
-  type = string
+variable "web_instance_type" {
+  description = "Instance type for Web EC2"
+  type        = string
+  default     = "t3.micro"
 }
 
-variable "backend_instance_type" {
-  description = "Instance type for Backend EC2"
+variable "app_instance_type" {
+  description = "Instance type for App EC2"
   type        = string
+  default     = "t3.micro"
 }
 
 variable "jenkins_instance_type" {
   description = "Instance type for Jenkins EC2"
   type        = string
+  default     = "t3.medium"
 }
 
 variable "grafana_instance_type" {
   description = "Instance type for Grafana EC2"
   type        = string
+  default     = "t3.small"
 }
 
 variable "prometheus_instance_type" {
   description = "Instance type for Prometheus EC2"
   type        = string
+  default     = "t3.small"
 }
 
-
-# RDS Variables
-variable "rds_engine" {
-  description = "Engine type for RDS (Postgres)"
-  type = string
-}
-
-variable "rds_instance_class"{
-  description = "Type Instsnce RDS Class"
-  type = string
-}
-
-variable "rds_db_name" {
-  description = "Name of the initial RDS database"
+variable "web_iam_instance_profile" {
+  description = "Existing IAM instance profile name for Web EC2. Ensure this profile exists before apply."
   type        = string
+  default     = "role-ec2-ewallet-web"
 }
 
-variable "rds_username" {
-  description = "Master username for RDS"
+variable "app_iam_instance_profile" {
+  description = "Existing IAM instance profile name for App EC2. Ensure this profile exists before apply."
   type        = string
+  default     = "role-ec2-ewallet-app"
 }
 
-variable "rds_password" {
-  description = "Master password for RDS"
+variable "jenkins_iam_instance_profile" {
+  description = "Existing IAM instance profile name for Jenkins EC2. Ensure this profile exists before apply."
   type        = string
-  sensitive   = true
+  default     = "role-ec2-ewallet-jenkins"
 }
 
-
-# ALB Variables
-variable "alb_name" {
-  description = "Name Internet-facing ALB"
-  type = string
+variable "monitoring_iam_instance_profile" {
+  description = "Existing IAM instance profile name for monitoring EC2 instances. Ensure this profile exists before apply."
+  type        = string
+  default     = "role-ec2-ewallet-monitoring"
 }
 
-variable "alb_internal" {
-  description = "Whether ALB is internal or internet-facing"
-  type        = bool
+variable "root_volume_size" {
+  description = "Root EBS volume size in GiB for EC2 workload instances"
+  type        = number
+  default     = 20
 }
 
-variable "alb_listener_port" {
-  description = "Ports for ALB listeners (HTTP/HTTPS)"
+variable "root_volume_type" {
+  description = "Root EBS volume type for EC2 workload instances"
+  type        = string
+  default     = "gp3"
+}
+
+# Security Group variables
+variable "alb_ingress_ports" {
+  description = "Ingress ports for internet HTTP/HTTPS"
   type        = list(number)
 }
 
-
-# ILB Variables (Internal Load Balancer)
-variable "ilb_name" {
-  description = "Name of the Internal Load Balancer"
-  type        = string
-}
-
-variable "lib_internal"{
-  description = "Whether ILB is internal (should be true)"
-  type        = bool
-}
-
-variable "lib_listener_port"{
-  description = "Port for the ILB listener"
-  type        = number
-}
-
-
-# Route 53 (Private DNS)
-variable "domain_name" {
-  description = "Name of Private Hosted Zone"
-  type        = string
-}
-variable "route53_records" {
-  description = "Map of record names and FQDNs for internal DNS"
-  type        = map(string)
-}
-
-
-# Security Group
-
-#1. ALB Security Group
-variable "alb_ingress_ports" {
-  description = "ingress traffic for internet http/https"
-  type = list(number)
-}
 variable "alb_ingress_cidr_blocks" {
-  description = "ingress traffic for public web internet"
-  type = list(number)
+  description = "CIDR blocks allowed to reach the future ALB"
+  type        = list(string)
 }
+
 variable "alb_egress_ports_to_web" {
-  description = "forward traffic to http/https"
-  type = list(number)
+  description = "Future ALB egress ports to Web-tier"
+  type        = list(number)
 }
+
 variable "alb_egress_sg_targets" {
-  description = "forward traffic to web-tier on ec2 "
-  type = list(number)
+  description = "Security group targets for future ALB egress to Web-tier"
+  type        = list(string)
 }
 
-
-# 2. Web-tier EC2 Security Group
 variable "web_ingress_ports" {
-  description = "recive inbound traffic for Alb Web and Prometheus 80,443,9100 "
-  type = list(number)
-}
-variable "web_ingress_sg_sources" {
-  description = "inbound alb , prometheus "
-}
-variable "web_egress_ports_to_app" {
-  description = "outbound trffic to app-tier 8080 "
-  type = list(number)
-}
-variable "web_egress_sg_targets_to_app" {
-  description = "outbound trffic to app-tier 8080 "
-  type = list(number)
-}
-variable "web_egress_ports_to_nat" {
-  description = "outbound trffic to nat 443 "
-  type = list(number)
-}
-variable "web_egress_cidr_blocks_to_nat"{
-  description = "outbound trffic to nat 443 "
-  type = list(number)
+  description = "Application ports Web-tier accepts from the future ALB"
+  type        = list(number)
 }
 
-# 3. App-tier EC2 Security Group
+variable "web_ingress_sg_sources" {
+  description = "Security group sources allowed to reach Web-tier"
+  type        = list(string)
+}
+
+variable "web_metrics_ingress_ports" {
+  description = "Metrics ports Web-tier accepts from Prometheus"
+  type        = list(number)
+}
+
+variable "web_metrics_ingress_sg_sources" {
+  description = "Security group sources allowed to scrape Web-tier metrics"
+  type        = list(string)
+}
+
+variable "web_egress_ports_to_ilb" {
+  description = "Outbound ports from Web-tier to future ILB"
+  type        = list(number)
+}
+
+variable "web_egress_sg_targets_to_ilb" {
+  description = "ILB security group targets for Web-tier egress"
+  type        = list(string)
+}
+
+variable "ilb_ingress_ports" {
+  description = "Ports future ILB accepts from Web-tier"
+  type        = list(number)
+}
+
+variable "ilb_ingress_sg_sources" {
+  description = "Security group sources allowed to reach future ILB"
+  type        = list(string)
+}
+
+variable "ilb_egress_ports_to_app" {
+  description = "Ports future ILB forwards to App-tier"
+  type        = list(number)
+}
+
+variable "ilb_egress_sg_targets_to_app" {
+  description = "App-tier security group targets for future ILB egress"
+  type        = list(string)
+}
 
 variable "app_ingress_ports" {
-  description = "inbound traffic for web-tier frontend and Prometheus"
-  type = list(number)
+  description = "Application ports App-tier accepts from future ILB"
+  type        = list(number)
 }
+
 variable "app_ingress_sg_sources" {
-  description = "inbound traffic for web-tier frontend and Prometheus"
-  type = list(number)
+  description = "Security group sources allowed to reach App-tier application ports"
+  type        = list(string)
 }
+
+variable "app_metrics_ingress_ports" {
+  description = "Metrics ports App-tier accepts from Prometheus"
+  type        = list(number)
+}
+
+variable "app_metrics_ingress_sg_sources" {
+  description = "Security group sources allowed to scrape App-tier metrics"
+  type        = list(string)
+}
+
 variable "app_egress_ports_to_rds" {
-  description = "outbound traffic to rds "
-  type = list(number)
-}   
+  description = "Outbound ports from App-tier to future RDS"
+  type        = list(number)
+}
+
 variable "app_egress_sg_targets_to_rds" {
-  description = "outbound traffic to rds "
-  type = list(number)
-}
-variable "app_egress_ports_to_nat" {
-  description = "outbound traffic to nat 443 "
-  type = list(number)
-}
-variable "app_egress_cidr_blocks_to_nat" {
-  description = "outbound traffic to nat 443 "
-  type = list(number)
+  description = "RDS security group targets for App-tier egress"
+  type        = list(string)
 }
 
-# 4. RDS Security Group
 variable "rds_ingress_ports" {
-  description = "inbound traffic from app-tier rds 5432 "
-  type = list(number)
+  description = "Inbound ports future RDS accepts from App-tier"
+  type        = list(number)
 }
+
 variable "rds_ingress_sg_sources" {
-  description = "inbound traffic from app-tier rds 5432 "
-  type = list(number)
-}
-variable "rds_egress_cidr_blocks" {
-  description = "outbound traffic all 0.0.0.0/0 "
-  type = list(number)
+  description = "Security group sources allowed to reach future RDS"
+  type        = list(string)
 }
 
-# 5. Prometheus Security Group
 variable "prometheus_ingress_ports" {
-  description = "inbound traffic from 9090"
-  type = list(number)
+  description = "Inbound ports for future Prometheus"
+  type        = list(number)
 }
+
 variable "prometheus_ingress_sources" {
-  description = "inbound traffic from nat,local ip"
-  type = list(number)
+  description = "CIDR blocks allowed to access future Prometheus"
+  type        = list(string)
 }
+
 variable "prometheus_egress_targets" {
-  description = "outbound traffic to metrics web/app "
-  type = list(number)
+  description = "Security group targets for future Prometheus scraping"
+  type        = list(string)
 }
+
 variable "prometheus_egress_ports" {
-  description = "outbound traffic to metrics web/app 9100,443 "
-  type = list(number)
-}
-variable "prometheus_egress_cidr_blocks" {
-  description = "outbound traffic all "
-  type = list(number)
+  description = "Outbound ports for future Prometheus scraping"
+  type        = list(number)
 }
 
-# 6. Grafana Security Group
 variable "grafana_ingress_ports" {
-  description = "inbound traffic access web grafana from nat , local ip"
-  type = list(number)
+  description = "Inbound ports for future Grafana"
+  type        = list(number)
 }
+
 variable "grafana_ingress_sources" {
-  description = "inbound traffic access web grafana from nat , local ip"
-  type = list(number)
+  description = "CIDR blocks allowed to access future Grafana"
+  type        = list(string)
 }
+
 variable "grafana_egress_ports" {
-  description = "outbound traffic pull metrices from Prometheus 9090, 443"
-  type = list(number)
+  description = "Outbound ports from future Grafana to Prometheus"
+  type        = list(number)
 }
+
 variable "grafana_egress_sg_targets" {
-  description = "outbound traffic pull metrices from Prometheus 9090, 443"
-  type = list(number)
-}
-variable "grafana_egress_cidr_blocks" {
-  description = "outbound traffic all "
-  type = list(number)
+  description = "Security group targets for future Grafana egress"
+  type        = list(string)
 }
 
-# 7. Jenkins Security Group
 variable "jenkins_ingress_ports" {
-  description = "inbound traffic access web jenkins 8080 from nat and local ip "
-  type = list(number)
-}
-variable "jenkins_ingress_sources" {
-  description = "inbound traffic access web jenkins 8080 from nat and local ip "
-  type = list(number)
-}
-variable "jenkins_egress_ports_to_internet" {
-  description = "outbound traffic 443 "
-  type = list(number)
-}
-variable "jenkins_egress_cidr_blocks" {
-  description = "outbound traffic all "
-  type = list(number)
-}
-variable "jenkins_egress_ports_to_ec2" {
-  description = "outbound traffic jenkins access to ssh port 22 "
-  type = list(number)
-}
-variable "jenkins_egress_sg_targets_to_ec2" {
-  description = "outbound traffic jenkins to web-tier , app-tier "
-  type = list(number)
+  description = "Inbound ports for future Jenkins"
+  type        = list(number)
 }
 
- # 8. NAT Instance Security Group
- variable "nat_ingress_sources" {
-  description = "intbound traffic  web-tier , app-tier ,grafana ,jenkins to nat to internet "
-  type = list(number)
+variable "jenkins_ingress_sources" {
+  description = "CIDR blocks allowed to access future Jenkins"
+  type        = list(string)
 }
- variable "nat_egress_cidr_blocks" {
-  description = "nat outbound traffic all "
-  type = list(number)
+
+variable "jenkins_egress_ports_to_internet" {
+  description = "Outbound internet ports for future Jenkins"
+  type        = list(number)
+}
+
+variable "jenkins_egress_cidr_blocks" {
+  description = "CIDR blocks future Jenkins can reach"
+  type        = list(string)
+}
+
+variable "jenkins_egress_ports_to_ec2" {
+  description = "Outbound ports from future Jenkins to EC2 tiers"
+  type        = list(number)
+}
+
+variable "jenkins_egress_sg_targets_to_ec2" {
+  description = "Security group targets for future Jenkins access to EC2 tiers"
+  type        = list(string)
+}
+
+variable "nat_ingress_sources" {
+  description = "CIDR blocks allowed to send traffic through the NAT Instance"
+  type        = list(string)
+}
+
+variable "nat_egress_cidr_blocks" {
+  description = "CIDR blocks the NAT Instance can reach"
+  type        = list(string)
 }

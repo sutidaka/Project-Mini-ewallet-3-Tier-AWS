@@ -3,7 +3,7 @@ variable "project_name" {
   type        = string
 }
 
-variable "ami_id" {
+variable "nat_ami_id" {
   description = "AMI ID to use for NAT Instance (Amazon Linux 2)"
   type        = string
 }
@@ -16,11 +16,6 @@ variable "nat_instance_type" {
 
 variable "subnet_id" {
   description = "Public Subnet ID to launch the NAT Instance"
-  type        = string
-}
-
-variable "key_name" {
-  description = "SSH key pair name"
   type        = string
 }
 

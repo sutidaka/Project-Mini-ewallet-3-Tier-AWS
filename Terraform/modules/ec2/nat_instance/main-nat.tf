@@ -1,13 +1,12 @@
 resource "aws_instance" "nat_instance" {
-  ami                         = var.ami_id
+  ami                         = var.nat_ami_id
   instance_type               = var.nat_instance_type
   subnet_id                   = var.subnet_id
   associate_public_ip_address = true
-  key_name                    = var.key_name
   source_dest_check           = false
-  vpc_security_group_ids = [var.security_group_id]
+  vpc_security_group_ids      = [var.security_group_id]
 
-# Script forward traffic nat-instance 
+  # Script forward traffic nat-instance
   user_data = <<-EOF
               #!/bin/bash
               sysctl -w net.ipv4.ip_forward=1
@@ -33,7 +32,7 @@ resource "aws_instance" "nat_instance" {
 # Elastic IP สำหรับ NAT Instance
 resource "aws_eip" "nat_eip" {
   instance = aws_instance.nat_instance.id
-  # vpc = true 
+  # vpc = true
 
   tags = {
     Name = "${var.project_name}-nat-eip"
