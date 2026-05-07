@@ -11,8 +11,8 @@ variable "igw_id" {
   type        = string
 }
 
-variable "nat_instance_id" {
-  description = "NAT Instance EC2 ID"
+variable "nat_network_interface_id" {
+  description = "NAT Instance primary network interface ID"
   type        = string
 }
 

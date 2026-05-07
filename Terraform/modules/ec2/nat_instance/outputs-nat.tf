@@ -3,6 +3,11 @@ output "nat_instance_id" {
   value       = aws_instance.nat_instance.id
 }
 
+output "nat_network_interface_id" {
+  description = "Primary network interface ID of the NAT Instance"
+  value       = aws_instance.nat_instance.primary_network_interface_id
+}
+
 output "public_ip" {
   description = "Public IP ของ NAT Instance"
   value       = aws_eip.nat_eip.public_ip

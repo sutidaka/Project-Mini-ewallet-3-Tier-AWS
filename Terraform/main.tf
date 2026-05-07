@@ -44,10 +44,10 @@ module "igw" {
 
 # --- Route Tables ---
 module "route_table" {
-  source          = "./modules/route-table"
-  vpc_id          = module.vpc.vpc_id
-  igw_id          = module.igw.igw_id
-  nat_instance_id = module.nat_instance.nat_instance_id
+  source                   = "./modules/route-table"
+  vpc_id                   = module.vpc.vpc_id
+  igw_id                   = module.igw.igw_id
+  nat_network_interface_id = module.nat_instance.nat_network_interface_id
 
   public_subnet_ids     = module.subnet.public_subnet_ids
   web_subnet_ids        = module.subnet.web_subnet_ids
@@ -201,7 +201,7 @@ module "grafana_instance" {
   name                        = "ewallet-prod-grafana"
   ami_id                      = var.ami_id
   instance_type               = var.grafana_instance_type
-  subnet_id                   = module.subnet.app_subnet_ids[0]
+  subnet_id                   = module.subnet.monitoring_subnet_ids[0]
   vpc_security_group_ids      = [module.security_group.sg_grafana_id]
   iam_instance_profile        = var.monitoring_iam_instance_profile
   root_volume_size            = var.root_volume_size
@@ -222,7 +222,7 @@ module "prometheus_instance" {
   name                        = "ewallet-prod-prometheus"
   ami_id                      = var.ami_id
   instance_type               = var.prometheus_instance_type
-  subnet_id                   = module.subnet.app_subnet_ids[0]
+  subnet_id                   = module.subnet.monitoring_subnet_ids[0]
   vpc_security_group_ids      = [module.security_group.sg_prometheus_id]
   iam_instance_profile        = var.monitoring_iam_instance_profile
   root_volume_size            = var.root_volume_size
