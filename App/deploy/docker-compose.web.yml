@@ -1,9 +1,17 @@
-version: "3.9"
-
 services:
   frontend:
-    image: 314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-frontend:${IMAGE_TAG}
+    image: ${WEB_IMAGE}
     container_name: ewallet-frontend
     restart: always
     ports:
-      - "5173:5173"
+      - "80:80"
+    env_file:
+      - .env
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

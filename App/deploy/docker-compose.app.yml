@@ -1,11 +1,15 @@
-version: "3.9"
-
 services:
   backend:
-    image: 314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-backend:${IMAGE_TAG}
+    image: ${APP_IMAGE}
     container_name: ewallet-backend
     restart: always
     ports:
       - "8000:8000"
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

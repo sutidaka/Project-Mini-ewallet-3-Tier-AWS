@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../config';
 
 const DepositForm = () => {
   const [userId, setUserId] = useState('');
@@ -6,7 +7,7 @@ const DepositForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/wallet/deposit`, {
+    const response = await fetch(`${API_BASE_URL}/wallet/deposit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: parseInt(userId), amount: parseFloat(amount) }),

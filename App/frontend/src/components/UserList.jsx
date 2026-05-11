@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../config';
 
 const UserList = () => {
   const [users, setUsers] = useState([]);
 
   const fetchUsers = async () => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/users`);
+    const response = await fetch(`${API_BASE_URL}/users`);
     const data = await response.json();
     setUsers(data);
   };

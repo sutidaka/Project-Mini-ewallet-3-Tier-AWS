@@ -1,127 +1,239 @@
 pipeline {
     agent any
 
+    options {
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        choice(
+            name: 'DEPLOY_MODE',
+            choices: ['backend-only', 'full'],
+            description: 'backend-only deploys App EC2 only. full deploys backend first, then Web EC2 after ILB_DNS is available.'
+        )
+        string(name: 'APP_EC2_HOST', defaultValue: '10.0.2.240', description: 'Private IP or DNS of the App EC2 instance.')
+        string(name: 'WEB_EC2_HOST', defaultValue: '10.0.1.68', description: 'Private IP or DNS of the Web EC2 instance.')
+        string(name: 'ILB_DNS', defaultValue: 'internal-ewallet-prod-ilb-1420350594.ap-southeast-1.elb.amazonaws.com', description: 'Internal Load Balancer DNS name. Required only for DEPLOY_MODE=full. Do not include http://.')
+    }
+
     environment {
-        AWS_REGION      = 'ap-southeast-1'
-        AWS_ACCOUNT     = '314146333464'
+        AWS_REGION       = 'ap-southeast-1'
+        AWS_ACCOUNT_ID   = '314146333464'
+        ECR_REGISTRY     = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com'
+        ECR_APP_REPO_URI = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-backend'
+        ECR_WEB_REPO_URI = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-frontend'
 
-        BACKEND_ECR     = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-backend'
-        FRONTEND_ECR    = '314146333464.dkr.ecr.ap-southeast-1.amazonaws.com/ewallet-frontend'
+        IMAGE_TAG        = "${BUILD_NUMBER}"
 
-        IMAGE_TAG       = "${BUILD_NUMBER}"
+        SSH_USER         = 'ec2-user'
+        APP_DEPLOY_PATH  = '/opt/ewallet/backend'
+        WEB_DEPLOY_PATH  = '/opt/ewallet/frontend'
 
-        APP_SERVER      = '10.0.20.145'
-        WEB_SERVER      = '10.0.1.94'
-        SSH_USER        = 'ec2-user'
-
-        APP_DEPLOY_PATH = '/opt/ewallet/backend'
-        WEB_DEPLOY_PATH = '/opt/ewallet/frontend'
+        RDS_HOST         = 'database-1.cruku0222l1u.ap-southeast-1.rds.amazonaws.com'
+        DB_PORT          = '5432'
+        DB_NAME          = 'database-1'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/sutidaka/Project-Mini-ewallet-AWS.git',
-                        credentialsId: 'tokengit'
-                    ]]
-                ])
+                checkout scm
             }
         }
 
-        stage('Build Backend Image') {
+        stage('Validate Base Inputs') {
             steps {
-                sh '''
-                    docker build -t ewallet-backend:${IMAGE_TAG} App/backend
-                '''
-            }
-        }
-
-        stage('Build Frontend Image') {
-            steps {
-                sh '''
-                    docker build -t ewallet-frontend:${IMAGE_TAG} App/frontend
-                '''
+                script {
+                    if (!params.APP_EC2_HOST?.trim()) {
+                        error('APP_EC2_HOST is required.')
+                    }
+                    if (params.DEPLOY_MODE == 'full' && !params.WEB_EC2_HOST?.trim()) {
+                        error('WEB_EC2_HOST is required when DEPLOY_MODE=full.')
+                    }
+                }
             }
         }
 
         stage('Login to ECR') {
             steps {
                 sh '''
-                    aws ecr get-login-password --region ${AWS_REGION} \
-                    | docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    set -euo pipefail
+                    aws ecr get-login-password --region "${AWS_REGION}" \
+                    | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
                 '''
             }
         }
 
-        stage('Tag and Push Images') {
+        stage('Build Backend Image') {
             steps {
                 sh '''
-                    docker tag ewallet-backend:${IMAGE_TAG} ${BACKEND_ECR}:${IMAGE_TAG}
-                    docker push ${BACKEND_ECR}:${IMAGE_TAG}
-
-                    docker tag ewallet-frontend:${IMAGE_TAG} ${FRONTEND_ECR}:${IMAGE_TAG}
-                    docker push ${FRONTEND_ECR}:${IMAGE_TAG}
+                    set -euo pipefail
+                    docker build --pull -t "${ECR_APP_REPO_URI}:${IMAGE_TAG}" App/backend
                 '''
             }
         }
 
-        stage('Prepare Remote Paths') {
+        stage('Push Backend Image') {
             steps {
-                sshagent(credentials: ['ssh-ewallet']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${APP_SERVER} "mkdir -p ${APP_DEPLOY_PATH}"
-                        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${WEB_SERVER} "mkdir -p ${WEB_DEPLOY_PATH}"
-                    '''
-                }
-            }
-        }
-
-        stage('Copy Compose Files') {
-            steps {
-                sshagent(credentials: ['ssh-ewallet']) {
-                    sh '''
-                        scp -o StrictHostKeyChecking=no App/deploy/docker-compose.app.yml ${SSH_USER}@${APP_SERVER}:${APP_DEPLOY_PATH}/docker-compose.yml
-                        scp -o StrictHostKeyChecking=no App/deploy/docker-compose.web.yml ${SSH_USER}@${WEB_SERVER}:${WEB_DEPLOY_PATH}/docker-compose.yml
-                    '''
-                }
+                sh '''
+                    set -euo pipefail
+                    docker push "${ECR_APP_REPO_URI}:${IMAGE_TAG}"
+                '''
             }
         }
 
         stage('Deploy Backend') {
             steps {
-                sshagent(credentials: ['ssh-ewallet']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${APP_SERVER} "
-                            aws ecr get-login-password --region ${AWS_REGION} \
-                            | docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${AWS_เREGION}.amazonaws.com && \
-                            cd ${APP_DEPLOY_PATH} && \
-                            export IMAGE_TAG=${IMAGE_TAG} && \
-                            docker compose pull && \
-                            docker compose up -d && \
-                            docker ps
-                        "
-                    '''
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'db-credential',
+                        usernameVariable: 'RDS_USERNAME',
+                        passwordVariable: 'RDS_PASSWORD'
+                    )
+                ]) {
+                    sshagent(credentials: ['ssh-ec2-key']) {
+                        sh '''
+                            set +x
+                            set -euo pipefail
+
+                            ssh -o StrictHostKeyChecking=no "${SSH_USER}@${APP_EC2_HOST}" "sudo mkdir -p '${APP_DEPLOY_PATH}' && sudo chown -R '${SSH_USER}:${SSH_USER}' '${APP_DEPLOY_PATH}'"
+                            scp -o StrictHostKeyChecking=no App/deploy/docker-compose.app.yml "${SSH_USER}@${APP_EC2_HOST}:${APP_DEPLOY_PATH}/docker-compose.yml"
+                            scp -o StrictHostKeyChecking=no App/backend/init.sql "${SSH_USER}@${APP_EC2_HOST}:${APP_DEPLOY_PATH}/init.sql"
+
+                            backend_env="$(mktemp)"
+                            trap 'rm -f "${backend_env}"' EXIT
+
+                            cat > "${backend_env}" <<EOF
+APP_IMAGE=${ECR_APP_REPO_URI}:${IMAGE_TAG}
+APP_ENV=production
+APP_PORT=8000
+DB_HOST=${RDS_HOST}
+DB_PORT=${DB_PORT}
+DB_NAME=${DB_NAME}
+DB_USER=${RDS_USERNAME}
+DB_PASSWORD=${RDS_PASSWORD}
+SQL_ECHO=false
+CORS_ALLOW_ORIGINS=
+EOF
+
+                            scp -o StrictHostKeyChecking=no "${backend_env}" "${SSH_USER}@${APP_EC2_HOST}:${APP_DEPLOY_PATH}/.env"
+
+                            ssh -o StrictHostKeyChecking=no "${SSH_USER}@${APP_EC2_HOST}" \
+                                "AWS_REGION='${AWS_REGION}' ECR_REGISTRY='${ECR_REGISTRY}' APP_DEPLOY_PATH='${APP_DEPLOY_PATH}' bash -s" <<'REMOTE_BACKEND'
+set -euo pipefail
+
+cd "${APP_DEPLOY_PATH}"
+chmod 600 .env
+
+aws ecr get-login-password --region "${AWS_REGION}" \
+| docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+docker compose pull
+docker compose up -d
+
+for attempt in $(seq 1 30); do
+    if curl -fsS http://localhost:8000/health && curl -fsS http://localhost:8000/health/db; then
+        exit 0
+    fi
+    sleep 3
+done
+
+docker compose logs --tail=100 backend
+exit 1
+REMOTE_BACKEND
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Deploy Frontend') {
+        stage('Validate ILB DNS') {
+            when {
+                expression { params.DEPLOY_MODE == 'full' }
+            }
             steps {
-                sshagent(credentials: ['ssh-ewallet']) {
+                script {
+                    def ilbDns = params.ILB_DNS?.trim()
+                    if (!ilbDns) {
+                        error('ILB_DNS is required when DEPLOY_MODE=full.')
+                    }
+                    if (ilbDns.startsWith('http://') || ilbDns.startsWith('https://')) {
+                        error('ILB_DNS must be a DNS name only. Do not include http:// or https://.')
+                    }
+                }
+            }
+        }
+
+        stage('Build Frontend Image') {
+            when {
+                expression { params.DEPLOY_MODE == 'full' }
+            }
+            steps {
+                sh '''
+                    set -euo pipefail
+                    docker build --pull -t "${ECR_WEB_REPO_URI}:${IMAGE_TAG}" App/frontend
+                '''
+            }
+        }
+
+        stage('Push Frontend Image') {
+            when {
+                expression { params.DEPLOY_MODE == 'full' }
+            }
+            steps {
+                sh '''
+                    set -euo pipefail
+                    docker push "${ECR_WEB_REPO_URI}:${IMAGE_TAG}"
+                '''
+            }
+        }
+
+        stage('Deploy Frontend') {
+            when {
+                expression { params.DEPLOY_MODE == 'full' }
+            }
+            steps {
+                sshagent(credentials: ['ssh-ec2-key']) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${WEB_SERVER} "
-                            aws ecr get-login-password --region ${AWS_REGION} \
-                            | docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com && \
-                            cd ${WEB_DEPLOY_PATH} && \
-                            export IMAGE_TAG=${IMAGE_TAG} && \
-                            docker compose pull && \
-                            docker compose up -d && \
-                            docker ps
-                        "
+                        set +x
+                        set -euo pipefail
+
+                        ssh -o StrictHostKeyChecking=no "${SSH_USER}@${WEB_EC2_HOST}" "sudo mkdir -p '${WEB_DEPLOY_PATH}' && sudo chown -R '${SSH_USER}:${SSH_USER}' '${WEB_DEPLOY_PATH}'"
+                        scp -o StrictHostKeyChecking=no App/deploy/docker-compose.web.yml "${SSH_USER}@${WEB_EC2_HOST}:${WEB_DEPLOY_PATH}/docker-compose.yml"
+
+                        web_env="$(mktemp)"
+                        trap 'rm -f "${web_env}"' EXIT
+
+                        cat > "${web_env}" <<EOF
+WEB_IMAGE=${ECR_WEB_REPO_URI}:${IMAGE_TAG}
+BACKEND_UPSTREAM=http://${ILB_DNS}
+EOF
+
+                        scp -o StrictHostKeyChecking=no "${web_env}" "${SSH_USER}@${WEB_EC2_HOST}:${WEB_DEPLOY_PATH}/.env"
+
+                        ssh -o StrictHostKeyChecking=no "${SSH_USER}@${WEB_EC2_HOST}" \
+                            "AWS_REGION='${AWS_REGION}' ECR_REGISTRY='${ECR_REGISTRY}' WEB_DEPLOY_PATH='${WEB_DEPLOY_PATH}' bash -s" <<'REMOTE_FRONTEND'
+set -euo pipefail
+
+cd "${WEB_DEPLOY_PATH}"
+chmod 600 .env
+
+aws ecr get-login-password --region "${AWS_REGION}" \
+| docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+docker compose pull
+docker compose up -d
+
+for attempt in $(seq 1 30); do
+    if curl -fsS http://localhost/ && curl -fsS http://localhost/api/health; then
+        exit 0
+    fi
+    sleep 3
+done
+
+docker compose logs --tail=100 frontend
+exit 1
+REMOTE_FRONTEND
                     '''
                 }
             }
@@ -130,10 +242,10 @@ pipeline {
 
     post {
         success {
-            echo 'Deploy completed successfully.'
+            echo "Deploy completed successfully with DEPLOY_MODE=${params.DEPLOY_MODE}."
         }
         failure {
-            echo 'Deploy failed. Please check build logs.'
+            echo 'Deploy failed. Check the stage logs above; secrets are intentionally not printed.'
         }
     }
 }
