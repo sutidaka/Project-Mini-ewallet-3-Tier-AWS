@@ -3,6 +3,7 @@ pipeline {
 
     options {
         disableConcurrentBuilds()
+        skipDefaultCheckout(true)
     }
 
     parameters {
@@ -38,6 +39,21 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Preflight Jenkins Runtime') {
+            steps {
+                sh '''
+                    set -euo pipefail
+                    command -v docker
+                    docker version
+                    docker compose version
+                    command -v aws
+                    aws --version
+                    command -v ssh
+                    aws sts get-caller-identity >/dev/null
+                '''
             }
         }
 
