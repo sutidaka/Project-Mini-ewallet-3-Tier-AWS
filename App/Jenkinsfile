@@ -148,7 +148,7 @@ docker compose pull
 docker compose up -d
 
 for attempt in $(seq 1 30); do
-    if curl -fsS http://localhost:8000/health && curl -fsS http://localhost:8000/health/db; then
+    if curl -fsS http://localhost:8080/health && curl -fsS http://localhost:8080/health/db; then
         exit 0
     fi
     sleep 3
@@ -222,7 +222,7 @@ REMOTE_BACKEND
 
                         cat > "${web_env}" <<EOF
 WEB_IMAGE=${ECR_WEB_REPO_URI}:${IMAGE_TAG}
-BACKEND_UPSTREAM=http://${ILB_DNS}
+BACKEND_UPSTREAM=http://${ILB_DNS}:8080
 EOF
 
                         scp -o StrictHostKeyChecking=no "${web_env}" "${SSH_USER}@${WEB_EC2_HOST}:${WEB_DEPLOY_PATH}/.env"
