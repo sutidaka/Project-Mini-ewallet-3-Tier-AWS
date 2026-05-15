@@ -12,8 +12,8 @@ pipeline {
             choices: ['backend-only', 'full'],
             description: 'backend-only deploys App EC2 only. full deploys backend first, then Web EC2 after ILB_DNS is available.'
         )
-        string(name: 'APP_EC2_HOST', defaultValue: '10.0.2.240', description: 'Private IP or DNS of the App EC2 instance.')
-        string(name: 'WEB_EC2_HOST', defaultValue: '10.0.1.68', description: 'Private IP or DNS of the Web EC2 instance.')
+        string(name: 'APP_EC2_HOSTS', defaultValue: '10.0.2.240,10.0.20.245', description: 'Comma-separated private IPs or DNS names of App EC2 instances.')
+        string(name: 'WEB_EC2_HOSTS', defaultValue: '10.0.1.68,10.0.10.43', description: 'Comma-separated private IPs or DNS names of Web EC2 instances.')
         string(name: 'ILB_DNS', defaultValue: 'internal-ewallet-prod-ilb-1420350594.ap-southeast-1.elb.amazonaws.com', description: 'Internal Load Balancer DNS name. Required only for DEPLOY_MODE=full. Do not include http://.')
     }
 
@@ -60,11 +60,11 @@ pipeline {
         stage('Validate Base Inputs') {
             steps {
                 script {
-                    if (!params.APP_EC2_HOST?.trim()) {
-                        error('APP_EC2_HOST is required.')
+                    if (!params.APP_EC2_HOSTS?.trim()) {
+                        error('APP_EC2_HOSTS is required.')
                     }
-                    if (params.DEPLOY_MODE == 'full' && !params.WEB_EC2_HOST?.trim()) {
-                        error('WEB_EC2_HOST is required when DEPLOY_MODE=full.')
+                    if (params.DEPLOY_MODE == 'full' && !params.WEB_EC2_HOSTS?.trim()) {
+                        error('WEB_EC2_HOSTS is required when DEPLOY_MODE=full.')
                     }
                 }
             }
@@ -112,10 +112,6 @@ pipeline {
                             set +x
                             set -euo pipefail
 
-                            ssh -o StrictHostKeyChecking=no "${SSH_USER}@${APP_EC2_HOST}" "sudo mkdir -p '${APP_DEPLOY_PATH}' && sudo chown -R '${SSH_USER}:${SSH_USER}' '${APP_DEPLOY_PATH}'"
-                            scp -o StrictHostKeyChecking=no App/deploy/docker-compose.app.yml "${SSH_USER}@${APP_EC2_HOST}:${APP_DEPLOY_PATH}/docker-compose.yml"
-                            scp -o StrictHostKeyChecking=no App/backend/init.sql "${SSH_USER}@${APP_EC2_HOST}:${APP_DEPLOY_PATH}/init.sql"
-
                             backend_env="$(mktemp)"
                             trap 'rm -f "${backend_env}"' EXIT
 
@@ -132,10 +128,16 @@ SQL_ECHO=false
 CORS_ALLOW_ORIGINS=
 EOF
 
-                            scp -o StrictHostKeyChecking=no "${backend_env}" "${SSH_USER}@${APP_EC2_HOST}:${APP_DEPLOY_PATH}/.env"
+                            for app_host in $(printf '%s' "${APP_EC2_HOSTS}" | tr ',' ' '); do
+                                [ -n "${app_host}" ] || continue
 
-                            ssh -o StrictHostKeyChecking=no "${SSH_USER}@${APP_EC2_HOST}" \
-                                "AWS_REGION='${AWS_REGION}' ECR_REGISTRY='${ECR_REGISTRY}' APP_DEPLOY_PATH='${APP_DEPLOY_PATH}' bash -s" <<'REMOTE_BACKEND'
+                                ssh -o StrictHostKeyChecking=no "${SSH_USER}@${app_host}" "sudo mkdir -p '${APP_DEPLOY_PATH}' && sudo chown -R '${SSH_USER}:${SSH_USER}' '${APP_DEPLOY_PATH}'"
+                                scp -o StrictHostKeyChecking=no App/deploy/docker-compose.app.yml "${SSH_USER}@${app_host}:${APP_DEPLOY_PATH}/docker-compose.yml"
+                                scp -o StrictHostKeyChecking=no App/backend/init.sql "${SSH_USER}@${app_host}:${APP_DEPLOY_PATH}/init.sql"
+                                scp -o StrictHostKeyChecking=no "${backend_env}" "${SSH_USER}@${app_host}:${APP_DEPLOY_PATH}/.env"
+
+                                ssh -o StrictHostKeyChecking=no "${SSH_USER}@${app_host}" \
+                                    "AWS_REGION='${AWS_REGION}' ECR_REGISTRY='${ECR_REGISTRY}' APP_DEPLOY_PATH='${APP_DEPLOY_PATH}' bash -s" <<'REMOTE_BACKEND'
 set -euo pipefail
 
 cd "${APP_DEPLOY_PATH}"
@@ -157,6 +159,7 @@ done
 docker compose logs --tail=100 backend
 exit 1
 REMOTE_BACKEND
+                            done
                         '''
                     }
                 }
@@ -214,9 +217,6 @@ REMOTE_BACKEND
                         set +x
                         set -euo pipefail
 
-                        ssh -o StrictHostKeyChecking=no "${SSH_USER}@${WEB_EC2_HOST}" "sudo mkdir -p '${WEB_DEPLOY_PATH}' && sudo chown -R '${SSH_USER}:${SSH_USER}' '${WEB_DEPLOY_PATH}'"
-                        scp -o StrictHostKeyChecking=no App/deploy/docker-compose.web.yml "${SSH_USER}@${WEB_EC2_HOST}:${WEB_DEPLOY_PATH}/docker-compose.yml"
-
                         web_env="$(mktemp)"
                         trap 'rm -f "${web_env}"' EXIT
 
@@ -225,10 +225,15 @@ WEB_IMAGE=${ECR_WEB_REPO_URI}:${IMAGE_TAG}
 BACKEND_UPSTREAM=http://${ILB_DNS}:8080
 EOF
 
-                        scp -o StrictHostKeyChecking=no "${web_env}" "${SSH_USER}@${WEB_EC2_HOST}:${WEB_DEPLOY_PATH}/.env"
+                        for web_host in $(printf '%s' "${WEB_EC2_HOSTS}" | tr ',' ' '); do
+                            [ -n "${web_host}" ] || continue
 
-                        ssh -o StrictHostKeyChecking=no "${SSH_USER}@${WEB_EC2_HOST}" \
-                            "AWS_REGION='${AWS_REGION}' ECR_REGISTRY='${ECR_REGISTRY}' WEB_DEPLOY_PATH='${WEB_DEPLOY_PATH}' bash -s" <<'REMOTE_FRONTEND'
+                            ssh -o StrictHostKeyChecking=no "${SSH_USER}@${web_host}" "sudo mkdir -p '${WEB_DEPLOY_PATH}' && sudo chown -R '${SSH_USER}:${SSH_USER}' '${WEB_DEPLOY_PATH}'"
+                            scp -o StrictHostKeyChecking=no App/deploy/docker-compose.web.yml "${SSH_USER}@${web_host}:${WEB_DEPLOY_PATH}/docker-compose.yml"
+                            scp -o StrictHostKeyChecking=no "${web_env}" "${SSH_USER}@${web_host}:${WEB_DEPLOY_PATH}/.env"
+
+                            ssh -o StrictHostKeyChecking=no "${SSH_USER}@${web_host}" \
+                                "AWS_REGION='${AWS_REGION}' ECR_REGISTRY='${ECR_REGISTRY}' WEB_DEPLOY_PATH='${WEB_DEPLOY_PATH}' bash -s" <<'REMOTE_FRONTEND'
 set -euo pipefail
 
 cd "${WEB_DEPLOY_PATH}"
@@ -250,6 +255,7 @@ done
 docker compose logs --tail=100 frontend
 exit 1
 REMOTE_FRONTEND
+                        done
                     '''
                 }
             }

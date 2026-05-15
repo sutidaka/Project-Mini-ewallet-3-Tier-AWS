@@ -133,20 +133,22 @@ output "igw_id" {
   value = module.igw.igw_id
 }
 
-output "web_instance_id" {
-  value = module.web_instance.instance_id
+output "web_instances" {
+  value = {
+    for name, instance in module.web_instances : name => {
+      instance_id = instance.instance_id
+      private_ip  = instance.private_ip
+    }
+  }
 }
 
-output "web_private_ip" {
-  value = module.web_instance.private_ip
-}
-
-output "app_instance_id" {
-  value = module.app_instance.instance_id
-}
-
-output "app_private_ip" {
-  value = module.app_instance.private_ip
+output "app_instances" {
+  value = {
+    for name, instance in module.app_instances : name => {
+      instance_id = instance.instance_id
+      private_ip  = instance.private_ip
+    }
+  }
 }
 
 output "jenkins_instance_id" {

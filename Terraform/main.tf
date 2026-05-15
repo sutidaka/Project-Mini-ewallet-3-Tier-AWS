@@ -132,13 +132,42 @@ module "nat_instance" {
 }
 
 # --- EC2 Instances ---
-module "web_instance" {
-  source = "./modules/ec2/instance"
+locals {
+  web_instances = {
+    a = {
+      name      = "ewallet-prod-web-a"
+      subnet_id = module.subnet.web_subnet_ids[0]
+      az        = var.availability_zones[0]
+    }
+    b = {
+      name      = "ewallet-prod-web-b"
+      subnet_id = module.subnet.web_subnet_ids[1]
+      az        = var.availability_zones[1]
+    }
+  }
 
-  name                        = "ewallet-prod-web"
+  app_instances = {
+    a = {
+      name      = "ewallet-prod-app-a"
+      subnet_id = module.subnet.app_subnet_ids[0]
+      az        = var.availability_zones[0]
+    }
+    b = {
+      name      = "ewallet-prod-app-b"
+      subnet_id = module.subnet.app_subnet_ids[1]
+      az        = var.availability_zones[1]
+    }
+  }
+}
+
+module "web_instances" {
+  source   = "./modules/ec2/instance"
+  for_each = local.web_instances
+
+  name                        = each.value.name
   ami_id                      = var.ami_id
   instance_type               = var.web_instance_type
-  subnet_id                   = module.subnet.web_subnet_ids[0]
+  subnet_id                   = each.value.subnet_id
   vpc_security_group_ids      = [module.security_group.sg_web_instance_id]
   iam_instance_profile        = var.web_iam_instance_profile
   root_volume_size            = var.root_volume_size
@@ -146,20 +175,22 @@ module "web_instance" {
   associate_public_ip_address = false
 
   tags = {
-    Project     = "ewallet"
-    Environment = "prod"
-    ManagedBy   = "Terraform"
-    Role        = "frontend"
+    Project          = "ewallet"
+    Environment      = "prod"
+    ManagedBy        = "Terraform"
+    Role             = "frontend"
+    AvailabilityZone = each.value.az
   }
 }
 
-module "app_instance" {
-  source = "./modules/ec2/instance"
+module "app_instances" {
+  source   = "./modules/ec2/instance"
+  for_each = local.app_instances
 
-  name                        = "ewallet-prod-app"
+  name                        = each.value.name
   ami_id                      = var.ami_id
   instance_type               = var.app_instance_type
-  subnet_id                   = module.subnet.app_subnet_ids[0]
+  subnet_id                   = each.value.subnet_id
   vpc_security_group_ids      = [module.security_group.sg_app_instance_id]
   iam_instance_profile        = var.app_iam_instance_profile
   root_volume_size            = var.root_volume_size
@@ -167,10 +198,11 @@ module "app_instance" {
   associate_public_ip_address = false
 
   tags = {
-    Project     = "ewallet"
-    Environment = "prod"
-    ManagedBy   = "Terraform"
-    Role        = "backend"
+    Project          = "ewallet"
+    Environment      = "prod"
+    ManagedBy        = "Terraform"
+    Role             = "backend"
+    AvailabilityZone = each.value.az
   }
 }
 
