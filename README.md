@@ -1,6 +1,6 @@
 # Mini E-Wallet AWS 3-Tier Project
 
-#Description
+# Description
 This project was built as a Cloud Engineer learning project to practice AWS infrastructure design and common tools.
 
 The project was inspired by the recommendation that a Web 3-Tier Archititecture is a good starting point for understanding real-world cloud architecture.
@@ -8,10 +8,10 @@ I used this concept as a foundation, then designed, deployed, tested, and improv
 
 The main objective is to understand how cloud compenets work together, including VPC, subnets. Security groups, ALB, internal load balancing, EC2, Docker, Jenkins, Grafana, Prometheus, Terraform and failure simulation
 
-#Architecture Overview
+# Architecture Overview
 ![AWS 3-Tier Architecture](./Diagram/diagram-3-tier.png)
 
-#What I Built
+# What I Built
 Designed AWS Web 3-Tier Architecture
 Provisioned AWS infrastructure using Infrastructure as Code (Terraform)
 Created VPC, subnets, route tables, and security groups with Terraform modules
@@ -26,7 +26,7 @@ Validated Web/App tier high availability by testing:
 - Auto Scaling Group (ASG) self-healing
 - AZ-level compute failure simulation
 
-#Future Improvements
+# Future Improvements
 In the next phase, I plan to extend this project to learn container orchestration and GitOps practices.
 Planned Improvements
 Migrate Web/App workloads from EC2 Docker to Kubernetes
