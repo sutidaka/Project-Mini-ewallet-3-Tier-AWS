@@ -9,7 +9,7 @@ I used this concept as a foundation, then designed, deployed, tested, and improv
 The main objective is to understand how cloud compenets work together, including VPC, subnets. Security groups, ALB, internal load balancing, EC2, Docker, Jenkins, Grafana, Prometheus, Terraform and failure simulation
 
 #Architecture Overview
-![AWS 3-Tier Architecture](./images/diagram-3-tier.png)
+![AWS 3-Tier Architecture](./Diagram/diagram-3-tier.png)
 
 #What I Built
 Designed AWS Web 3-Tier Architecture
