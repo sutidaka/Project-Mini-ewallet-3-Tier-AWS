@@ -12,27 +12,28 @@ The main objective is to understand how cloud compenets work together, including
 ![AWS 3-Tier Architecture](./Diagram/diagram-3-tier.png)
 
 # What I Built
-Designed AWS Web 3-Tier Architecture
-Provisioned AWS infrastructure using Infrastructure as Code (Terraform)
-Created VPC, subnets, route tables, and security groups with Terraform modules
-Deployed frontend and backend workloads on EC2 using Docker
-Configured Internet-facing ALB for frontend traffic
-Configured Internal Load Balancer (ILB) for backend traffic
-Implemented Jenkins CI/CD workflow
-Used Amazon ECR for Docker image registry
-Set up Prometheus, Grafana, and Node Exporter for monitoring
-Validated Web/App tier high availability by testing:
-- ALB/ILB health checks
-- Auto Scaling Group (ASG) self-healing
-- AZ-level compute failure simulation
+- Designed AWS Web 3-Tier Architecture
+- Provisioned AWS infrastructure using Infrastructure as Code (Terraform)
+- Created VPC, subnets, route tables, and security groups with Terraform modules
+- Deployed frontend and backend workloads on EC2 using Docker
+- Configured Internet-facing ALB for frontend traffic
+- Configured Internal Load Balancer (ILB) for backend traffic
+- Implemented Jenkins CI/CD workflow
+- Used Amazon ECR for Docker image registry
+- Set up Prometheus, Grafana, and Node Exporter for monitoring
+- Validated Web/App tier high availability by testing:
+-   ALB/ILB health checks
+-   Auto Scaling Group (ASG) self-healing
+-   AZ-level compute failure simulation
 
 # Future Improvements
 In the next phase, I plan to extend this project to learn container orchestration and GitOps practices.
 Planned Improvements
-Migrate Web/App workloads from EC2 Docker to Kubernetes
-Deploy the application on Amazon EKS
-Use Kubernetes Deployment, Service, Ingress, ConfigMap, and Secret
-Implement GitOps CI/CD workflow using Argo CD
-Add Horizontal Pod Autoscaler (HPA) for application scaling
-Upgrade RDS to Multi-AZ and test database failover
-Improve centralized logging and alerting
+
+- Migrate Web/App workloads from EC2 Docker to Kubernetes
+- Deploy the application on Amazon EKS
+- Use Kubernetes Deployment, Service, Ingress, ConfigMap, and Secret
+- Implement GitOps CI/CD workflow using Argo CD
+- Add Horizontal Pod Autoscaler (HPA) for application scaling
+- Upgrade RDS to Multi-AZ and test database failover
+- Improve centralized logging and alerting
